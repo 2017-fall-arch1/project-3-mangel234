@@ -17,53 +17,53 @@
 #define GREEN_LED BIT6
 
 
-AbRect rect10 = {abRectGetBounds, abRectCheck, {10,10}}; /**< 10x10 rectangle */
-AbRArrow rightArrow = {abRArrowGetBounds, abRArrowCheck, 30};
+AbRect paddle = {abRectGetBounds, abRectCheck, {15, 2}};
+AbRect paddleCPU = {abRectGetBounds, abRectCheck, {15, 2}};
+AbRect text = {abRectGetBounds, abRectCheck, {20, 20}};
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
-  {screenWidth/2 - 10, screenHeight/2 - 10}
+  {screenWidth/2 - 12, screenHeight/2 - 12}
 };
-
-Layer layer4 = {
-  (AbShape *)&rightArrow,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_PINK,
-  0
-};
-  
-
-Layer layer3 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle8,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_VIOLET,
-  &layer4,
-};
-
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_BLACK,
-  &layer3
+  COLOR_STEEL_BLUE,
+  0
 };
 
-Layer layer1 = {		/**< Layer with a red square */
-  (AbShape *)&rect10,
-  {screenWidth/2, screenHeight/2}, /**< center */
+Layer layer3 = {		/**< Layer with user text field*/
+  (AbShape *)&text,
+  {screenWidth/2 , screenHeight/2}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_RED,
+  COLOR_BLACK,
   &fieldLayer,
 };
 
-Layer layer0 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle14,
+Layer layer2 = {		/**< Layer with user paddle botttom*/
+  (AbShape *)&paddle,
+  
+  {screenWidth/2 , screenHeight/2 + 63}, /**< center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_STEEL_BLUE,
+  &layer3,
+};
+
+Layer layer1 = {		/**< Layer with CPU paddle top paddle*/
+  (AbShape *)&paddleCPU,
+  {screenWidth/2, screenHeight/2 - 63}, /**< center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_STEEL_BLUE,
+  &layer2,
+};
+
+Layer layer0 = {		/**< Layer with the ball */
+  (AbShape *)&circle4,
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_ORANGE,
+  COLOR_STEEL_BLUE,
   &layer1,
 };
 
@@ -78,15 +78,38 @@ typedef struct MovLayer_s {
 } MovLayer;
 
 /* initial value of {0,0} will be overwritten */
-MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
-MovLayer ml1 = { &layer1, {1,2}, &ml3 }; 
+//MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
+MovLayer ml2 = { &layer2, {2,0}, 0 };
+MovLayer ml1 = { &layer1, {2,0}, &ml2 }; 
 MovLayer ml0 = { &layer0, {2,1}, &ml1 }; 
+
 
 void movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
   int row, col;
   MovLayer *movLayer;
-
+   drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(0,20, "G", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(0,30, "F", COLOR_PURPLE, COLOR_BLACK);
+    drawString5x7(0,40, "U", COLOR_RED, COLOR_BLACK);
+    drawString5x7(0,50, "E", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(0,60, "L", COLOR_STEEL_BLUE, COLOR_BLACK);
+    drawString5x7(0,90, "D", COLOR_RED, COLOR_BLACK);
+    drawString5x7(0,100, "O", COLOR_RED, COLOR_BLACK);
+    drawString5x7(0,110, "C", COLOR_RED, COLOR_BLACK);
+    drawString5x7(0,120, "!", COLOR_RED, COLOR_BLACK);
+    drawString5x7(0,70, "..", COLOR_STEEL_BLUE, COLOR_BLACK);
+    drawString5x7(0,150, "Score:", COLOR_PURPLE, COLOR_BLACK);
+     
+    drawString5x7(120,20, "R", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(120,30, "O", COLOR_PURPLE, COLOR_BLACK);
+    drawString5x7(120,40, "B", COLOR_RED, COLOR_BLACK);
+    drawString5x7(120,50, "E", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(120,60, "R", COLOR_STEEL_BLUE, COLOR_BLACK);
+    
+    drawString5x7(120,70, "T", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(115,80, "<3", COLOR_PURPLE, COLOR_BLACK);
+    
   and_sr(~8);			/**< disable interrupts (GIE off) */
   for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
     Layer *l = movLayer->layer;
@@ -148,7 +171,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 }
 
 
-u_int bgColor = COLOR_BLUE;     /**< The background color */
+u_int bgColor = COLOR_BLACK;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
 Region fieldFence;		/**< fence around playing field  */
@@ -175,8 +198,9 @@ void main()
 
   layerGetBounds(&fieldLayer, &fieldFence);
 
-
+   
   enableWDTInterrupts();      /**< enable periodic interrupt */
+   drawString5x7(50 ,50, "PAUSE", COLOR_YELLOW, COLOR_BLACK);
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
 
@@ -197,11 +221,14 @@ void wdt_c_handler()
   static short count = 0;
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
+  
   if (count == 15) {
     mlAdvance(&ml0, &fieldFence);
     if (p2sw_read())
       redrawScreen = 1;
+    
     count = 0;
   } 
   P1OUT &= ~GREEN_LED;		    /**< Green LED off when cpu off */
+  //drawString5x7(50 ,50, "PAUSE", COLOR_YELLOW, COLOR_BLACK);
 }
