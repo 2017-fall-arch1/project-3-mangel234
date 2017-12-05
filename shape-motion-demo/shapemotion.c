@@ -17,10 +17,13 @@
 
 #define GREEN_LED BIT6
 
+int playerOne_Score = 0;
+int playerTwo_Score = 0;
+char scoreReferee[3];
 
 AbRectOutline paddle = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
 AbRectOutline paddleCPU = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
-AbRectOutline text = {abRectOutlineGetBounds, abRectOutlineCheck, {20, 20}};
+
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
@@ -35,13 +38,6 @@ Layer fieldLayer = {		/* playing field as a layer */
   0
 };
 
-Layer layer3 = {		/**< Layer with user text field*/
-  (AbShape *)&text,
-  {screenWidth/2 , screenHeight/2}, /**< center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_BLACK,
-  &fieldLayer,
-};
 
 Layer layer2 = {		/**< Layer with user paddle botttom*/
   (AbShape *)&paddle,
@@ -49,14 +45,14 @@ Layer layer2 = {		/**< Layer with user paddle botttom*/
   {screenWidth/2 , screenHeight/2 + 63}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_STEEL_BLUE,
-  &layer3,
+  &fieldLayer,
 };
 
 Layer layer1 = {		/**< Layer with CPU paddle top paddle*/
   (AbShape *)&paddleCPU,
   {screenWidth/2, screenHeight/2 - 63}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_STEEL_BLUE,
+  COLOR_PINK,
   &layer2,
 };
 
@@ -101,7 +97,6 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
     drawString5x7(0,120, "!", COLOR_RED, COLOR_BLACK);
     drawString5x7(0,70, "..", COLOR_STEEL_BLUE, COLOR_BLACK);
     drawString5x7(0,150, "Score:", COLOR_PURPLE, COLOR_BLACK);
-     
     drawString5x7(120,20, "R", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(120,30, "O", COLOR_PURPLE, COLOR_BLACK);
     drawString5x7(120,40, "B", COLOR_RED, COLOR_BLACK);
@@ -154,9 +149,11 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
  */
 void mlAdvance(MovLayer *ml, Region *fence)
 {
+    scoreReferee[1] = '-';
   Vec2 newPos;
   u_char axis;
   Region shapeBoundary;
+  
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
@@ -166,9 +163,45 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
 	newPos.axes[axis] += (2*velocity);
       }	/**< if outside of fence */
+    
+    if(shapeBoundary.topLeft.axes[1] < fence->topLeft.axes[1]){
+            newPos.axes[0] = screenWidth/2;
+            newPos.axes[1] =screenHeight/2;
+            ml->velocity.axes[0] = 2;
+            ml->layer->posNext = newPos;
+            playerOne_Score++;
+            int redrawScreen =1;
+            break;
+            
+     }
+     
+     else if(shapeBoundary.botRight.axes[1] > fence->botRight.axes[1]){
+            newPos.axes[0] = screenWidth/2;
+            newPos.axes[1] = screenHeight/2;
+            ml->velocity.axes[0] = -2;
+            ml->layer->posNext = newPos;
+            playerTwo_Score++;
+            int redrawScreen =1;
+            break;
+            
+     }
+     
     } /**< for axis */
-    ml->layer->posNext = newPos;
-  } /**< for ml */
+
+     int redrawScreen =1;
+     ml->layer->posNext =newPos;
+  
+  if(playerOne_Score > 9 || playerTwo_Score > 9){
+    playerOne_Score = 0;
+    playerTwo_Score = 0;
+
+  }
+    scoreReferee[0] = '0' + playerOne_Score;
+    scoreReferee[2] = '0' + playerTwo_Score;
+  }
+  int redrawScreen =1;
+  drawString5x7(37,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
+ 
 }
 
 
@@ -223,8 +256,9 @@ void main()
   layerInit(&layer0);
   layerDraw(&layer0);
 
-
+ 
   layerGetBounds(&fieldLayer, &fieldFence);
+  //drawString5x7(40,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
 
    
   enableWDTInterrupts();      /**< enable periodic interrupt */
