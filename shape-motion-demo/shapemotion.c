@@ -13,13 +13,14 @@
 #include <p2switches.h>
 #include <shape.h>
 #include <abCircle.h>
+#include "buzzer.h"
 
 #define GREEN_LED BIT6
 
 
-AbRect paddle = {abRectGetBounds, abRectCheck, {15, 2}};
-AbRect paddleCPU = {abRectGetBounds, abRectCheck, {15, 2}};
-AbRect text = {abRectGetBounds, abRectCheck, {20, 20}};
+AbRectOutline paddle = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
+AbRectOutline paddleCPU = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
+AbRectOutline text = {abRectOutlineGetBounds, abRectOutlineCheck, {20, 20}};
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
@@ -79,9 +80,9 @@ typedef struct MovLayer_s {
 
 /* initial value of {0,0} will be overwritten */
 //MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
-MovLayer ml2 = { &layer2, {2,0}, 0 };
-MovLayer ml1 = { &layer1, {2,0}, &ml2 }; 
-MovLayer ml0 = { &layer0, {2,1}, &ml1 }; 
+MovLayer ml2 = { &layer2, {2,0}, 0 }; //ball
+MovLayer ml1 = { &layer1, {2,0}, &ml2 }; //leftpad
+MovLayer ml0 = { &layer0, {2,1}, &ml1 }; //rightpad
 
 
 void movLayerDraw(MovLayer *movLayers, Layer *layers)
@@ -171,10 +172,36 @@ void mlAdvance(MovLayer *ml, Region *fence)
 }
 
 
+void p1_UP_DOWN(u_int sw) {
+  if(!(sw & (1<<0))) {
+    ml2.velocity.axes[0] = -5;
+  }
+  else if(!(sw & (1<<1))) {
+    ml2.velocity.axes[0] = 5;
+  }
+  else {
+    ml2.velocity.axes[0] = 0;
+  }
+}
+
+void p2_UP_DOWN(u_int sw) {
+  if(!(sw & (1<<2))) {
+    ml1.velocity.axes[0] = -5;
+  }
+  else if(!(sw & (1<<3))) {
+    ml1.velocity.axes[0] = 5;
+  }
+  else {
+    ml1.velocity.axes[0] = 0;
+  }
+}
+
+
 u_int bgColor = COLOR_BLACK;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
 Region fieldFence;		/**< fence around playing field  */
+Region fence;
 
 
 /** Initializes everything, enables interrupts and green LED, 
@@ -188,7 +215,8 @@ void main()
   configureClocks();
   lcd_init();
   shapeInit();
-  p2sw_init(1);
+    p2sw_init(15);
+
 
   shapeInit();
 
@@ -200,15 +228,21 @@ void main()
 
    
   enableWDTInterrupts();      /**< enable periodic interrupt */
-   drawString5x7(50 ,50, "PAUSE", COLOR_YELLOW, COLOR_BLACK);
+   drawString5x7(20,50, "COLLISIONLESS ", COLOR_YELLOW, COLOR_BLACK);
+   drawString5x7(50,60, "PONG", COLOR_YELLOW, COLOR_BLACK);
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
+u_int sw;
 
   for(;;) { 
+      sw = p2sw_read(); //added----------
     while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
       P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
       or_sr(0x10);	      /**< CPU OFF */
     }
+    p1_UP_DOWN(sw);
+    p2_UP_DOWN(sw);
+    
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
     movLayerDraw(&ml0, &layer0);
@@ -224,6 +258,8 @@ void wdt_c_handler()
   
   if (count == 15) {
     mlAdvance(&ml0, &fieldFence);
+    
+    
     if (p2sw_read())
       redrawScreen = 1;
     
