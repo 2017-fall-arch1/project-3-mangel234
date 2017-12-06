@@ -1,11 +1,3 @@
-/** \file shapemotion.c
-*  \brief This is a simple shape motion demo.
-*  This demo creates two layers containing shapes.
-*  One layer contains a rectangle and the other a circle.
-*  While the CPU is running the green LED is on, and
-*  when the screen does not need to be redrawn the CPU
-*  is turned off along with the green LED.
-*/  
 #include <msp430.h>
 #include <libTimer.h>
 #include <lcdutils.h>
@@ -13,8 +5,13 @@
 #include <p2switches.h>
 #include <shape.h>
 #include <abCircle.h>
+#include "buzzer.h"
 
 #define GREEN_LED BIT6
+
+int playerOne_Score = 0;
+int playerTwo_Score = 0;
+char scoreReferee[3];
 
 AbRect rect10 = {abRectGetBounds, abRectCheck, {2,10}}; //Paddle rectangles definition!
 AbRect line = {abRectGetBounds, abRectCheck, {1, 50}};//Paddle rectangles definition!
@@ -82,6 +79,7 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
   MovLayer *movLayer;
 
   
+  
   and_sr(~8);			/**< disable interrupts (GIE off) */ //Turn off all interrupts 
   for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
     Layer *l = movLayer->layer;
@@ -94,7 +92,7 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
   for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
     Region bounds;
     layerGetBounds(movLayer->layer, &bounds); 
-    //NOTE: I believe these next two lines tell the msp430 what the orientation is and how to render the objects of the LCD...
+
     lcd_setArea(bounds.topLeft.axes[0], bounds.topLeft.axes[1], 
     bounds.botRight.axes[0], bounds.botRight.axes[1]);
   //For every pixel in the area..
@@ -116,8 +114,8 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
   } // for moving layer being updated
 }	  
 
-//NOTE: What does this do...?
-Region fence = {{10,10}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
+
+//Region fence = {{10,10}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
 
 /** Advances a moving shape within a fence
 *  
@@ -126,6 +124,8 @@ Region fence = {{10,10}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Crea
 */
 void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region *fence)
 {
+    
+  scoreReferee[1] = '-';
   Vec2 newPos;
   Vec2 posBall; //not used
   Vec2 posRed; //notUsed
@@ -140,48 +140,57 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
   Region redBoundary;
   Region whiteBoundary;
   
-  //ballBoundary.topLeft.axes[0] = fence -> topLeft.axes[0] + 7;
- // ballBoundary.topLeft.axes[1] = fence -> topLeft.axes[1];
-  //ballBoundary.botRight.axes[0] = fence -> botRight.axes[0] - 7;
-  //ballBoundary.botRight.axes[1] = fence -> botRight.axes[0];
+  ballBoundary.topLeft.axes[0] = fence -> topLeft.axes[0] + 7;
+  ballBoundary.topLeft.axes[1] = fence -> topLeft.axes[1];
+  ballBoundary.botRight.axes[0] = fence -> botRight.axes[0] - 7;
+  ballBoundary.botRight.axes[1] = fence -> botRight.axes[0];
   
   for (; ml; ml = ml->next) 
   {
+      buzzer_set_period(0);
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity); 
     vec2Add(&posRed, &redPaddle->layer->posNext, &redPaddle->velocity); //not used
     vec2Add(&posWhite, &whitePaddle->layer->posNext, &whitePaddle->velocity); //not used
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
     abShapeGetBounds(redPaddle->layer->abShape, &posRed, &redBoundary);//not used
     abShapeGetBounds(whitePaddle->layer->abShape, &posWhite, &whiteBoundary); //not used
+    
         for (axis = 0; axis < 2; axis ++)
         {
           if((shapeBoundary.topLeft.axes[axis] < ballBoundary.topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > ballBoundary.botRight.axes[axis]))
           { 
-            if(shapeBoundary.topLeft.axes[1] > redBoundary.topLeft.axes[1] && shapeBoundary.botRight.axes[1] < redBoundary.botRight.axes[1] && shapeBoundary.topLeft.axes[0] > (screenWidth/2))
+            if( (shapeBoundary.topLeft.axes[1] > redBoundary.topLeft.axes[1]) && (shapeBoundary.botRight.axes[1] < redBoundary.botRight.axes[1]) && (shapeBoundary.topLeft.axes[0] > (screenWidth/2)))
             {
               int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
+              buzzer_set_period(4000);
               newPos.axes[0] += (2*velocity);
+             
               break;
             }
-            if(shapeBoundary.topLeft.axes[1] > whiteBoundary.topLeft.axes[1] && shapeBoundary.botRight.axes[1] < whiteBoundary.botRight.axes[1] && shapeBoundary.topLeft.axes[0] < (screenWidth/2))
+            if( (shapeBoundary.topLeft.axes[1] > whiteBoundary.topLeft.axes[1]) && (shapeBoundary.botRight.axes[1] < whiteBoundary.botRight.axes[1]) && (shapeBoundary.topLeft.axes[0] < (screenWidth/2)) )
             {
-              int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
-              newPos.axes[0] += (2*velocity);
-              break;
+                int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
+                buzzer_set_period(500);
+                newPos.axes[0] += (2*velocity);
+               
+                break;
             }
-            
           }
+          
           if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])) 
           {
             int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+            buzzer_set_period(500);
             newPos.axes[axis] += (2*velocity);
           } /**< for axis */
-          if (shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]) 
-          {
+         
+         
+         if (shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]){
             newPos.axes[0] = screenWidth/2;
             newPos.axes[1] = screenHeight/2;
             ml->velocity.axes[0] = 2;
             ml->layer->posNext = newPos;
+            playerOne_Score++;
             int redrawScreen = 1;
             break;
           }
@@ -191,14 +200,31 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
             newPos.axes[1] = screenHeight/2;
             ml->velocity.axes[0] = -2;
             ml->layer->posNext = newPos;
+            playerTwo_Score++;
             int redrawScreen = 1;
             break;
           }
+        
         }/**< for axis */
+         int redrawScreen =1;
         ml->layer->posNext = newPos;
+      
+        if(playerOne_Score > 9 || playerTwo_Score > 9){
+            playerOne_Score = 0;
+            playerTwo_Score = 0;
+
+            }
+            scoreReferee[0] = '0' + playerOne_Score;
+            scoreReferee[2] = '0' + playerTwo_Score;
+  
   }/**< for ml */
+ 
+    int redrawScreen = 1;
+ //drawString5x7(37,150, scoreReferee, COLOR_PINK, COLOR_BLACK);
+ //drawString5x7(50,50,"damn", COLOR_PINK, COLOR_BLACK);
 }
 
+//Allows the paddles to move in the direction depending of buttton press
 void p1(u_int button)
 {
     if( !(button & (1 << 0)))
@@ -249,6 +275,7 @@ void main()
   P1OUT |= GREEN_LED;
 
   configureClocks();
+  buzzer_init();
   lcd_init();
   shapeInit();
   p2sw_init(15);
@@ -257,7 +284,15 @@ void main()
 
   layerInit(&layer0);
   layerDraw(&layer0);
-drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
+
+
+  layerGetBounds(&fieldLayer, &fieldFence);
+  layerGetBounds(&layer1, &fieldPaddleRed);
+  layerGetBounds(&layer0, &fieldPaddleWhite);
+  layerGetBounds(&layer3, &fieldBall);
+  //Display adds on game
+    drawString5x7(37,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
+    drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,20, "G", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,30, "F", COLOR_PURPLE, COLOR_BLACK);
     drawString5x7(0,40, "U", COLOR_RED, COLOR_BLACK);
@@ -277,12 +312,6 @@ drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
     
     drawString5x7(120,70, "T", COLOR_YELLOW, COLOR_BLACK); 
     drawString5x7(115,80, "<3", COLOR_PURPLE, COLOR_BLACK);
-
-  layerGetBounds(&fieldLayer, &fieldFence);
-  layerGetBounds(&layer1, &fieldPaddleRed);
-  layerGetBounds(&layer0, &fieldPaddleWhite);
-  layerGetBounds(&layer3, &fieldBall);
-
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
   u_int button;
