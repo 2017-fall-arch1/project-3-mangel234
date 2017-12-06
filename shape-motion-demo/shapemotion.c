@@ -26,7 +26,7 @@ Layer layer3 = {
   (AbShape *)&circle4,
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_WHITE,
+  COLOR_RED,
   0,
 };
 
@@ -39,12 +39,12 @@ Layer fieldLayer = {		/* playing field as a layer */
   &layer3
 };
 
-//Red Paddle
+//Pink Paddle
 Layer layer1 = {
   (AbShape *)&rect10,
   {screenWidth/2 - 55, screenHeight/2 -55}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_RED,
+  COLOR_PINK,
   &fieldLayer,
 };
 
@@ -53,7 +53,7 @@ Layer layer0 = {
   (AbShape *)&rect10,
   {(screenWidth/2)+55, (screenHeight/2)+55}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_WHITE,
+  COLOR_GREEN,
   &layer1,
 };
 
@@ -162,7 +162,7 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
             if( (shapeBoundary.topLeft.axes[1] > redBoundary.topLeft.axes[1]) && (shapeBoundary.botRight.axes[1] < redBoundary.botRight.axes[1]) && (shapeBoundary.topLeft.axes[0] > (screenWidth/2)))
             {
               int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
-              buzzer_set_period(4000);
+              buzzer_set_period(3000);
               newPos.axes[0] += (2*velocity);
              
               break;
@@ -177,15 +177,15 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
             }
           }
           
-          if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])) 
-          {
-            int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+          if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])) {
+          
+              int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
             buzzer_set_period(500);
             newPos.axes[axis] += (2*velocity);
           } /**< for axis */
          
          
-         if (shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]){
+         if(shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]){
             newPos.axes[0] = screenWidth/2;
             newPos.axes[1] = screenHeight/2;
             ml->velocity.axes[0] = 2;
@@ -194,8 +194,7 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
             int redrawScreen = 1;
             break;
           }
-          else if (shapeBoundary.botRight.axes[0] > fence->botRight.axes[0]) 
-          {
+          else if (shapeBoundary.botRight.axes[0] > fence->botRight.axes[0]) {
             newPos.axes[0] = screenWidth/2;
             newPos.axes[1] = screenHeight/2;
             ml->velocity.axes[0] = -2;
@@ -220,7 +219,8 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
   }/**< for ml */
  
     int redrawScreen = 1;
- //drawString5x7(37,150, scoreReferee, COLOR_PINK, COLOR_BLACK);
+     drawString5x7(37,150, scoreReferee, COLOR_PINK, COLOR_BLACK);
+   
  //drawString5x7(50,50,"damn", COLOR_PINK, COLOR_BLACK);
 }
 
@@ -291,7 +291,7 @@ void main()
   layerGetBounds(&layer0, &fieldPaddleWhite);
   layerGetBounds(&layer3, &fieldBall);
   //Display adds on game
-    drawString5x7(37,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
+    //drawString5x7(37,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
     drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,20, "G", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,30, "F", COLOR_PURPLE, COLOR_BLACK);
@@ -312,8 +312,11 @@ void main()
     
     drawString5x7(120,70, "T", COLOR_YELLOW, COLOR_BLACK); 
     drawString5x7(115,80, "<3", COLOR_PURPLE, COLOR_BLACK);
+    //drawString5x7(20,50, "COLLISIONLESS ", COLOR_YELLOW, COLOR_BLACK);
+   //drawString5x7(50,60, "PONG", COLOR_YELLOW, COLOR_BLACK);
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
+  
   u_int button;
 
 
