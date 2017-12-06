@@ -1,11 +1,11 @@
 /** \file shapemotion.c
- *  \brief This is a simple shape motion demo.
- *  This demo creates two layers containing shapes.
- *  One layer contains a rectangle and the other a circle.
- *  While the CPU is running the green LED is on, and
- *  when the screen does not need to be redrawn the CPU
- *  is turned off along with the green LED.
- */  
+*  \brief This is a simple shape motion demo.
+*  This demo creates two layers containing shapes.
+*  One layer contains a rectangle and the other a circle.
+*  While the CPU is running the green LED is on, and
+*  when the screen does not need to be redrawn the CPU
+*  is turned off along with the green LED.
+*/  
 #include <msp430.h>
 #include <libTimer.h>
 #include <lcdutils.h>
@@ -13,61 +13,57 @@
 #include <p2switches.h>
 #include <shape.h>
 #include <abCircle.h>
-#include "buzzer.h"
 
 #define GREEN_LED BIT6
 
-int playerOne_Score = 0;
-int playerTwo_Score = 0;
-char scoreReferee[3];
-
-AbRectOutline paddle = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
-AbRectOutline paddleCPU = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
-
+AbRect rect10 = {abRectGetBounds, abRectCheck, {2,10}}; //Paddle rectangles definition!
+AbRect line = {abRectGetBounds, abRectCheck, {1, 50}};//Paddle rectangles definition!
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
-  {screenWidth/2 - 12, screenHeight/2 - 12}
+  {screenWidth/2 - 7, screenHeight/2 - 12}
 };
+
+//White ball
+Layer layer3 = {
+  (AbShape *)&circle4,
+  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_WHITE,
+  0,
+};
+
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_STEEL_BLUE,
-  0
+  COLOR_WHITE,
+  &layer3
 };
 
-
-Layer layer2 = {		/**< Layer with user paddle botttom*/
-  (AbShape *)&paddle,
-  
-  {screenWidth/2 , screenHeight/2 + 63}, /**< center */
+//Red Paddle
+Layer layer1 = {
+  (AbShape *)&rect10,
+  {screenWidth/2 - 55, screenHeight/2 -55}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_STEEL_BLUE,
+  COLOR_RED,
   &fieldLayer,
 };
 
-Layer layer1 = {		/**< Layer with CPU paddle top paddle*/
-  (AbShape *)&paddleCPU,
-  {screenWidth/2, screenHeight/2 - 63}, /**< center */
+//White Paddle
+Layer layer0 = {	
+  (AbShape *)&rect10,
+  {(screenWidth/2)+55, (screenHeight/2)+55}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_PINK,
-  &layer2,
-};
-
-Layer layer0 = {		/**< Layer with the ball */
-  (AbShape *)&circle4,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_STEEL_BLUE,
+  COLOR_WHITE,
   &layer1,
 };
 
 /** Moving Layer
- *  Linked list of layer references
- *  Velocity represents one iteration of change (direction & magnitude)
- */
+*  Linked list of layer references
+*  Velocity represents one iteration of change (direction & magnitude)
+*/
 typedef struct MovLayer_s {
   Layer *layer;
   Vec2 velocity;
@@ -75,17 +71,193 @@ typedef struct MovLayer_s {
 } MovLayer;
 
 /* initial value of {0,0} will be overwritten */
-//MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
-MovLayer ml2 = { &layer2, {2,0}, 0 }; //ball
-MovLayer ml1 = { &layer1, {2,0}, &ml2 }; //leftpad
-MovLayer ml0 = { &layer0, {2,1}, &ml1 }; //rightpad
+MovLayer ml3 = { &layer3, {1,3}, 0 }; /**< not all layers move */
+MovLayer ml1 = { &layer1, {0,5}, &ml3 }; 
+MovLayer ml0 = { &layer0, {0,5}, &ml1 }; 
 
-
+//Just draws anything aorund a moving layer 
 void movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
   int row, col;
   MovLayer *movLayer;
-   drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
+
+  
+  and_sr(~8);			/**< disable interrupts (GIE off) */ //Turn off all interrupts 
+  for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
+    Layer *l = movLayer->layer;
+    l->posLast = l->pos;
+    l->pos = l->posNext;
+  }
+  or_sr(8);			/**< disable interrupts (GIE on) */ //Turn on all interupts
+
+
+  for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
+    Region bounds;
+    layerGetBounds(movLayer->layer, &bounds); 
+    //NOTE: I believe these next two lines tell the msp430 what the orientation is and how to render the objects of the LCD...
+    lcd_setArea(bounds.topLeft.axes[0], bounds.topLeft.axes[1], 
+    bounds.botRight.axes[0], bounds.botRight.axes[1]);
+  //For every pixel in the area..
+    for (row = bounds.topLeft.axes[1]; row <= bounds.botRight.axes[1]; row++) {
+      for (col = bounds.topLeft.axes[0]; col <= bounds.botRight.axes[0]; col++) {
+  Vec2 pixelPos = {col, row};
+  u_int color = bgColor;
+  Layer *probeLayer; //We probe to get the colors..
+  for (probeLayer = layers; probeLayer; 
+      probeLayer = probeLayer->next) { /* probe all layers, in order */
+    if (abShapeCheck(probeLayer->abShape, &probeLayer->pos, &pixelPos)) {
+      color = probeLayer->color;
+      break; 
+    } /* if probe check */
+  } // for checking all layers at col, row
+  lcd_writeColor(color); 
+      } // for col
+    } // for row
+  } // for moving layer being updated
+}	  
+
+//NOTE: What does this do...?
+Region fence = {{10,10}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
+
+/** Advances a moving shape within a fence
+*  
+*  \param ml The moving shape to be advanced
+*  \param fence The region which will serve as a boundary for ml
+*/
+void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region *fence)
+{
+  Vec2 newPos;
+  Vec2 posBall; //not used
+  Vec2 posRed; //notUsed
+  Vec2 posWhite; //notused
+  
+  u_char axis;
+  u_char axisRed; //not used
+  u_char axisWhite; //not used
+  
+  Region shapeBoundary; //This is the fence
+  Region ballBoundary;
+  Region redBoundary;
+  Region whiteBoundary;
+  
+  //ballBoundary.topLeft.axes[0] = fence -> topLeft.axes[0] + 7;
+ // ballBoundary.topLeft.axes[1] = fence -> topLeft.axes[1];
+  //ballBoundary.botRight.axes[0] = fence -> botRight.axes[0] - 7;
+  //ballBoundary.botRight.axes[1] = fence -> botRight.axes[0];
+  
+  for (; ml; ml = ml->next) 
+  {
+    vec2Add(&newPos, &ml->layer->posNext, &ml->velocity); 
+    vec2Add(&posRed, &redPaddle->layer->posNext, &redPaddle->velocity); //not used
+    vec2Add(&posWhite, &whitePaddle->layer->posNext, &whitePaddle->velocity); //not used
+    abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
+    abShapeGetBounds(redPaddle->layer->abShape, &posRed, &redBoundary);//not used
+    abShapeGetBounds(whitePaddle->layer->abShape, &posWhite, &whiteBoundary); //not used
+        for (axis = 0; axis < 2; axis ++)
+        {
+          if((shapeBoundary.topLeft.axes[axis] < ballBoundary.topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > ballBoundary.botRight.axes[axis]))
+          { 
+            if(shapeBoundary.topLeft.axes[1] > redBoundary.topLeft.axes[1] && shapeBoundary.botRight.axes[1] < redBoundary.botRight.axes[1] && shapeBoundary.topLeft.axes[0] > (screenWidth/2))
+            {
+              int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
+              newPos.axes[0] += (2*velocity);
+              break;
+            }
+            if(shapeBoundary.topLeft.axes[1] > whiteBoundary.topLeft.axes[1] && shapeBoundary.botRight.axes[1] < whiteBoundary.botRight.axes[1] && shapeBoundary.topLeft.axes[0] < (screenWidth/2))
+            {
+              int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
+              newPos.axes[0] += (2*velocity);
+              break;
+            }
+            
+          }
+          if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])) 
+          {
+            int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+            newPos.axes[axis] += (2*velocity);
+          } /**< for axis */
+          if (shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]) 
+          {
+            newPos.axes[0] = screenWidth/2;
+            newPos.axes[1] = screenHeight/2;
+            ml->velocity.axes[0] = 2;
+            ml->layer->posNext = newPos;
+            int redrawScreen = 1;
+            break;
+          }
+          else if (shapeBoundary.botRight.axes[0] > fence->botRight.axes[0]) 
+          {
+            newPos.axes[0] = screenWidth/2;
+            newPos.axes[1] = screenHeight/2;
+            ml->velocity.axes[0] = -2;
+            ml->layer->posNext = newPos;
+            int redrawScreen = 1;
+            break;
+          }
+        }/**< for axis */
+        ml->layer->posNext = newPos;
+  }/**< for ml */
+}
+
+void p1(u_int button)
+{
+    if( !(button & (1 << 0)))
+    {
+      ml1.velocity.axes[1] = -5;
+    }
+    else if(!( button & (1<<1)))
+    {
+      ml1.velocity.axes[1] = 5; 
+    }
+    else
+    {
+      ml1.velocity.axes[1] = 0;
+    }
+}
+
+void p2(u_int button)
+{
+    if( !(button & (1 << 2)))
+    {
+      ml0.velocity.axes[1] = -5;
+    }
+    else if(!( button & (1<<3)))
+    {
+      ml0.velocity.axes[1] = 5; 
+    }
+    else
+    {
+      ml0.velocity.axes[1] = 0;
+    }
+}
+
+u_int bgColor = COLOR_BLACK;     /**< The background color */
+int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
+
+Region fieldFence;		/**< fence around playing field  */
+Region fieldPaddleRed;
+Region fieldPaddleWhite;
+Region fieldBall;
+
+
+/** Initializes everything, enables interrupts and green LED, 
+*  and handles the rendering for the screen
+*/
+void main()
+{
+  P1DIR |= GREEN_LED;		/**< Green led on when CPU on */		
+  P1OUT |= GREEN_LED;
+
+  configureClocks();
+  lcd_init();
+  shapeInit();
+  p2sw_init(15);
+
+  shapeInit();
+
+  layerInit(&layer0);
+  layerDraw(&layer0);
+drawString5x7(1,0, "Sponsored by HINOJOSA", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,20, "G", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(0,30, "F", COLOR_PURPLE, COLOR_BLACK);
     drawString5x7(0,40, "U", COLOR_RED, COLOR_BLACK);
@@ -103,180 +275,28 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
     drawString5x7(120,50, "E", COLOR_YELLOW, COLOR_BLACK);
     drawString5x7(120,60, "R", COLOR_STEEL_BLUE, COLOR_BLACK);
     
-    drawString5x7(120,70, "T", COLOR_YELLOW, COLOR_BLACK);
+    drawString5x7(120,70, "T", COLOR_YELLOW, COLOR_BLACK); 
     drawString5x7(115,80, "<3", COLOR_PURPLE, COLOR_BLACK);
-    
-  and_sr(~8);			/**< disable interrupts (GIE off) */
-  for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
-    Layer *l = movLayer->layer;
-    l->posLast = l->pos;
-    l->pos = l->posNext;
-  }
-  or_sr(8);			/**< disable interrupts (GIE on) */
 
-
-  for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
-    Region bounds;
-    layerGetBounds(movLayer->layer, &bounds);
-    lcd_setArea(bounds.topLeft.axes[0], bounds.topLeft.axes[1], 
-		bounds.botRight.axes[0], bounds.botRight.axes[1]);
-    for (row = bounds.topLeft.axes[1]; row <= bounds.botRight.axes[1]; row++) {
-      for (col = bounds.topLeft.axes[0]; col <= bounds.botRight.axes[0]; col++) {
-	Vec2 pixelPos = {col, row};
-	u_int color = bgColor;
-	Layer *probeLayer;
-	for (probeLayer = layers; probeLayer; 
-	     probeLayer = probeLayer->next) { /* probe all layers, in order */
-	  if (abShapeCheck(probeLayer->abShape, &probeLayer->pos, &pixelPos)) {
-	    color = probeLayer->color;
-	    break; 
-	  } /* if probe check */
-	} // for checking all layers at col, row
-	lcd_writeColor(color); 
-      } // for col
-    } // for row
-  } // for moving layer being updated
-}	  
-
-
-
-//Region fence = {{10,30}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
-
-/** Advances a moving shape within a fence
- *  
- *  \param ml The moving shape to be advanced
- *  \param fence The region which will serve as a boundary for ml
- */
-void mlAdvance(MovLayer *ml, Region *fence)
-{
-    scoreReferee[1] = '-';
-  Vec2 newPos;
-  u_char axis;
-  Region shapeBoundary;
-  
-  for (; ml; ml = ml->next) {
-    vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
-    abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
-    for (axis = 0; axis < 2; axis ++) {
-      if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) ||
-	  (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis]) ) {
-	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	newPos.axes[axis] += (2*velocity);
-      }	/**< if outside of fence */
-    
-    if(shapeBoundary.topLeft.axes[1] < fence->topLeft.axes[1]){
-            newPos.axes[0] = screenWidth/2;
-            newPos.axes[1] =screenHeight/2;
-            ml->velocity.axes[0] = 2;
-            ml->layer->posNext = newPos;
-            playerOne_Score++;
-            int redrawScreen =1;
-            break;
-            
-     }
-     
-     else if(shapeBoundary.botRight.axes[1] > fence->botRight.axes[1]){
-            newPos.axes[0] = screenWidth/2;
-            newPos.axes[1] = screenHeight/2;
-            ml->velocity.axes[0] = -2;
-            ml->layer->posNext = newPos;
-            playerTwo_Score++;
-            int redrawScreen =1;
-            break;
-            
-     }
-     
-    } /**< for axis */
-
-     int redrawScreen =1;
-     ml->layer->posNext =newPos;
-  
-  if(playerOne_Score > 9 || playerTwo_Score > 9){
-    playerOne_Score = 0;
-    playerTwo_Score = 0;
-
-  }
-    scoreReferee[0] = '0' + playerOne_Score;
-    scoreReferee[2] = '0' + playerTwo_Score;
-  }
-  int redrawScreen =1;
-  drawString5x7(37,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
- 
-}
-
-
-void p1_UP_DOWN(u_int sw) {
-  if(!(sw & (1<<0))) {
-    ml2.velocity.axes[0] = -5;
-  }
-  else if(!(sw & (1<<1))) {
-    ml2.velocity.axes[0] = 5;
-  }
-  else {
-    ml2.velocity.axes[0] = 0;
-  }
-}
-
-void p2_UP_DOWN(u_int sw) {
-  if(!(sw & (1<<2))) {
-    ml1.velocity.axes[0] = -5;
-  }
-  else if(!(sw & (1<<3))) {
-    ml1.velocity.axes[0] = 5;
-  }
-  else {
-    ml1.velocity.axes[0] = 0;
-  }
-}
-
-
-u_int bgColor = COLOR_BLACK;     /**< The background color */
-int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
-
-Region fieldFence;		/**< fence around playing field  */
-Region fence;
-
-
-/** Initializes everything, enables interrupts and green LED, 
- *  and handles the rendering for the screen
- */
-void main()
-{
-  P1DIR |= GREEN_LED;		/**< Green led on when CPU on */		
-  P1OUT |= GREEN_LED;
-
-  configureClocks();
-  lcd_init();
-  shapeInit();
-    p2sw_init(15);
-
-
-  shapeInit();
-
-  layerInit(&layer0);
-  layerDraw(&layer0);
-
- 
   layerGetBounds(&fieldLayer, &fieldFence);
-  //drawString5x7(40,150, scoreReferee, COLOR_PURPLE, COLOR_BLACK);
+  layerGetBounds(&layer1, &fieldPaddleRed);
+  layerGetBounds(&layer0, &fieldPaddleWhite);
+  layerGetBounds(&layer3, &fieldBall);
 
-   
   enableWDTInterrupts();      /**< enable periodic interrupt */
-   drawString5x7(20,50, "COLLISIONLESS ", COLOR_YELLOW, COLOR_BLACK);
-   drawString5x7(50,60, "PONG", COLOR_YELLOW, COLOR_BLACK);
   or_sr(0x8);	              /**< GIE (enable interrupts) */
+  u_int button;
 
-u_int sw;
 
   for(;;) { 
-      sw = p2sw_read(); //added----------
+    button = p2sw_read();
     while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
       P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
       or_sr(0x10);	      /**< CPU OFF */
     }
-    p1_UP_DOWN(sw);
-    p2_UP_DOWN(sw);
     
+    p1(button);
+    p2(button);
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
     movLayerDraw(&ml0, &layer0);
@@ -289,16 +309,11 @@ void wdt_c_handler()
   static short count = 0;
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
-  
   if (count == 15) {
-    mlAdvance(&ml0, &fieldFence);
-    
-    
+    mlAdvance(&ml1, &ml0, &ml0, &fieldFence);
     if (p2sw_read())
       redrawScreen = 1;
-    
     count = 0;
   } 
   P1OUT &= ~GREEN_LED;		    /**< Green LED off when cpu off */
-  //drawString5x7(50 ,50, "PAUSE", COLOR_YELLOW, COLOR_BLACK);
 }
