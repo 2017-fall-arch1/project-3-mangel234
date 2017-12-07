@@ -13,7 +13,7 @@ int playerOne_Score = 0;
 int playerTwo_Score = 0;
 char scoreReferee[3];
 
-AbRect rect10 = {abRectGetBounds, abRectCheck, {2,10}}; //Paddle rectangles definition!
+AbRect rect10 = {abRectGetBounds, abRectCheck, {2,12}}; //Paddle rectangles definition!
 AbRect line = {abRectGetBounds, abRectCheck, {1, 50}};//Paddle rectangles definition!
 
 AbRectOutline fieldOutline = {	/* playing field */
@@ -21,9 +21,9 @@ AbRectOutline fieldOutline = {	/* playing field */
   {screenWidth/2 - 7, screenHeight/2 - 12}
 };
 
-//White ball
+// ball
 Layer layer3 = {
-  (AbShape *)&circle4,
+  (AbShape *)&circle3,
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_RED,
@@ -48,7 +48,7 @@ Layer layer1 = {
   &fieldLayer,
 };
 
-//White Paddle
+//green Paddle
 Layer layer0 = {	
   (AbShape *)&rect10,
   {(screenWidth/2)+55, (screenHeight/2)+55}, /**< bit below & right of center */
@@ -68,7 +68,7 @@ typedef struct MovLayer_s {
 } MovLayer;
 
 /* initial value of {0,0} will be overwritten */
-MovLayer ml3 = { &layer3, {1,3}, 0 }; /**< not all layers move */
+MovLayer ml3 = { &layer3, {1,5}, 0 }; /**< not all layers move */
 MovLayer ml1 = { &layer1, {0,5}, &ml3 }; 
 MovLayer ml0 = { &layer0, {0,5}, &ml1 }; 
 
@@ -143,7 +143,7 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
   ballBoundary.topLeft.axes[0] = fence -> topLeft.axes[0] + 7;
   ballBoundary.topLeft.axes[1] = fence -> topLeft.axes[1];
   ballBoundary.botRight.axes[0] = fence -> botRight.axes[0] - 7;
-  ballBoundary.botRight.axes[1] = fence -> botRight.axes[0];
+  ballBoundary.botRight.axes[1] = fence -> botRight.axes[1];
   
   for (; ml; ml = ml->next) 
   {
@@ -213,8 +213,8 @@ void mlAdvance(MovLayer *whitePaddle, MovLayer *redPaddle, MovLayer *ml, Region 
             playerTwo_Score = 0;
 
             }
-            scoreReferee[0] = '0' + playerOne_Score;
-            scoreReferee[2] = '0' + playerTwo_Score;
+            scoreReferee[2] = '0' + playerOne_Score;
+            scoreReferee[0] = '0' + playerTwo_Score;
   
   }/**< for ml */
  
