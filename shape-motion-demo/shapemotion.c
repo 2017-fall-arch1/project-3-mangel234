@@ -9,8 +9,8 @@
 
 #define GREEN_LED BIT6
 
-int playerOne_Score = 0;
-int playerTwo_Score = 0;
+char  playerOne_Score = 0;
+char playerTwo_Score = 0;
 char scoreReferee[3];
 
 AbRect rect10 = {abRectGetBounds, abRectCheck, {2,12}}; //Paddle rectangles definition!
